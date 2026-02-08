@@ -2,25 +2,26 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { ChatMessage } from "../types";
 
-const getApiKey = () => process.env.API_KEY;
-
 export const checkApiKey = async (): Promise<boolean> => {
   if (window.aistudio && window.aistudio.hasSelectedApiKey) {
      return await window.aistudio.hasSelectedApiKey();
   }
+  // Fallback to checking process.env.API_KEY which is injected by the environment
   return !!process.env.API_KEY;
 };
 
 export const promptForApiKey = async () => {
   if (window.aistudio && window.aistudio.openSelectKey) {
     await window.aistudio.openSelectKey();
+  } else {
+    console.warn("AI Studio key selection not available in this environment.");
   }
 };
 
 const getClient = () => {
-  const key = getApiKey();
-  if (!key) throw new Error("API Key required for Chat/Analysis.");
-  return new GoogleGenAI({ apiKey: key });
+  // According to guidelines, use process.env.API_KEY directly.
+  // We must create a new instance to ensure we use the latest key from the environment.
+  return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 // Retry helper for API calls

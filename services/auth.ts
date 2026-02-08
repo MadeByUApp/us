@@ -18,19 +18,25 @@ export const initAuthDB = () => {
         localStorage.setItem(DB_KEY, JSON.stringify(initialDB));
     } else {
         // Ensure admin credentials are always up to date and correct in the DB
-        const users = JSON.parse(stored) as User[];
-        const adminIndex = users.findIndex(u => u.username === ADMIN_USER.username);
-        
-        if (adminIndex === -1) {
-            // Admin was deleted somehow, restore it
-            users.unshift(ADMIN_USER);
-            localStorage.setItem(DB_KEY, JSON.stringify(users));
-        } else {
-            // Ensure admin password matches hardcoded secure password
-            if (users[adminIndex].password !== ADMIN_USER.password) {
-                users[adminIndex].password = ADMIN_USER.password;
+        try {
+            const users = JSON.parse(stored) as User[];
+            const adminIndex = users.findIndex(u => u.username === ADMIN_USER.username);
+            
+            if (adminIndex === -1) {
+                // Admin was deleted somehow, restore it
+                users.unshift(ADMIN_USER);
                 localStorage.setItem(DB_KEY, JSON.stringify(users));
+            } else {
+                // Ensure admin password matches hardcoded secure password
+                if (users[adminIndex].password !== ADMIN_USER.password) {
+                    users[adminIndex].password = ADMIN_USER.password;
+                    localStorage.setItem(DB_KEY, JSON.stringify(users));
+                }
             }
+        } catch (e) {
+            // Corrupt DB, reset
+            console.error("DB corrupt, resetting");
+            localStorage.setItem(DB_KEY, JSON.stringify([ADMIN_USER]));
         }
     }
 };
@@ -39,14 +45,18 @@ export const loginUser = (username: string, password: string): User | null => {
     const stored = localStorage.getItem(DB_KEY);
     if (!stored) return null;
 
-    const users = JSON.parse(stored) as User[];
-    // Case sensitive check for security
-    const user = users.find(u => u.username === username && u.password === password);
+    try {
+        const users = JSON.parse(stored) as User[];
+        // Case sensitive check for security
+        const user = users.find(u => u.username === username && u.password === password);
 
-    if (user) {
-        // Return user without password for state
-        const { password, ...safeUser } = user;
-        return safeUser as User;
+        if (user) {
+            // Return user without password for state
+            const { password, ...safeUser } = user;
+            return safeUser as User;
+        }
+    } catch(e) {
+        return null;
     }
     return null;
 };
@@ -54,7 +64,11 @@ export const loginUser = (username: string, password: string): User | null => {
 export const getUsers = (): User[] => {
     const stored = localStorage.getItem(DB_KEY);
     if (!stored) return [];
-    return JSON.parse(stored);
+    try {
+        return JSON.parse(stored);
+    } catch {
+        return [];
+    }
 };
 
 export const addUser = (username: string, password: string): boolean => {
@@ -73,16 +87,33 @@ export const addUser = (username: string, password: string): boolean => {
     return true;
 };
 
-export const deleteUser = (username: string): boolean => {
-    if (username === ADMIN_USER.username) return false; // Cannot delete admin
+export const deleteUser = (usernameToDelete: string): boolean => {
+    // 1. Safety check for Admin
+    if (usernameToDelete === ADMIN_USER.username) {
+        console.warn("Attempted to delete admin.");
+        return false;
+    }
+
     let users = getUsers();
     const initialLen = users.length;
-    users = users.filter(u => u.username !== username);
+
+    // 2. Filter out the user
+    const newUsers = users.filter(u => u.username !== usernameToDelete);
     
-    if (users.length !== initialLen) {
-        localStorage.setItem(DB_KEY, JSON.stringify(users));
+    // 3. Check if deletion happened
+    if (newUsers.length < initialLen) {
+        localStorage.setItem(DB_KEY, JSON.stringify(newUsers));
         return true;
     }
+    
+    // 4. Fallback: Try whitespace trimmed matching if exact match failed
+    // This helps if the DB has "User " but we requested "User"
+    const trimmedUsers = users.filter(u => u.username.trim() !== usernameToDelete.trim());
+    if (trimmedUsers.length < initialLen) {
+        localStorage.setItem(DB_KEY, JSON.stringify(trimmedUsers));
+        return true;
+    }
+
     return false;
 };
 

@@ -1,0 +1,7 @@
+{
+  "name": "Copy of MadeByU - Estudio de Impresión Pro",
+  "description": "Espacio de trabajo profesional para diseño de camisetas con herramientas avanzadas de semitonos, puntillismo y separación de colores impulsadas por Gemini AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
